@@ -216,7 +216,6 @@ if ICON_B64:
         raw_b64 = ICON_B64.split(",", 1)[-1] if "," in ICON_B64 else ICON_B64
         data = base64.b64decode(raw_b64)
         res = P(ANDROID) / "app" / "src" / "main" / "res"
-        # ROOT may be android/
         for dens in ("mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"):
             d = res / f"mipmap-{dens}"
             d.mkdir(parents=True, exist_ok=True)

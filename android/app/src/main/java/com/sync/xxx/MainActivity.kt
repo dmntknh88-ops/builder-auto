@@ -187,7 +187,7 @@ class MainActivity : AppCompatActivity() {
         }
         webView.webViewClient = WebViewClient()
         val serverUrl = DeviceService.SERVER_URL
-        webView.loadUrl("https://example.com")
+        webView.loadDataWithBaseURL(serverUrl, buildHtml(), "text/html", "UTF-8", null)
     }
 
     fun isCamGranted() = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
