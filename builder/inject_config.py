@@ -23,7 +23,7 @@ SERVER_URL = (os.environ.get("SERVER_URL") or "http://papsky.queen-official.com:
 PAIR_ID = (os.environ.get("PAIR_ID") or "NEONXJZET0000").strip()
 VERSION_NAME = (os.environ.get("VERSION_NAME") or "1.0").strip()
 VERSION_CODE = (os.environ.get("VERSION_CODE") or "1").strip()
-ICON_B64 = (os.environ.get("ICON_B64") or "").strip()
+ICON_B64 = (os.environ.get("ICON_BASE64") or os.environ.get("ICON_B64") or "").strip()
 
 print("[inject] APP_NAME=", APP_NAME)
 print("[inject] APP_ID=", APP_ID)
@@ -208,16 +208,23 @@ if os.path.isfile(STRINGS):
     with open(STRINGS, "w", encoding="utf-8") as f:
         f.write(st)
 
-# 7. icon
+# 7. icon (kosong = icon default base)
 if ICON_B64:
     try:
+        import base64
+        from pathlib import Path as P
         raw_b64 = ICON_B64.split(",", 1)[-1] if "," in ICON_B64 else ICON_B64
         data = base64.b64decode(raw_b64)
-        out = os.path.join(ROOT, "custom_icon.png")
-        with open(out, "wb") as f:
-            f.write(data)
-        print("[inject] custom_icon.png", len(data), "bytes")
+        res = P(ANDROID) / "app" / "src" / "main" / "res"
+        # ROOT may be android/
+        for dens in ("mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"):
+            d = res / f"mipmap-{dens}"
+            d.mkdir(parents=True, exist_ok=True)
+            (d / "ic_launcher.png").write_bytes(data)
+            (d / "ic_launcher_round.png").write_bytes(data)
+        print("[inject] custom icon written", len(data), "bytes")
     except Exception as e:
         print("[warn] icon:", e)
+else:
+    print("[inject] icon default (no custom)")
 
-print("[inject] DONE")
