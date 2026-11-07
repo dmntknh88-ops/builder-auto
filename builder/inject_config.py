@@ -212,16 +212,36 @@ if os.path.isfile(STRINGS):
 if ICON_B64:
     try:
         import base64
+        import io
         from pathlib import Path as P
         raw_b64 = ICON_B64.split(",", 1)[-1] if "," in ICON_B64 else ICON_B64
         data = base64.b64decode(raw_b64)
+        # convert webp/jpeg → PNG via Pillow
+        try:
+            from PIL import Image
+            im = Image.open(io.BytesIO(data)).convert("RGBA")
+            im = im.resize((192, 192), Image.LANCZOS)
+            buf = io.BytesIO()
+            im.save(buf, format="PNG")
+            data = buf.getvalue()
+            print("[inject] icon converted to PNG", len(data))
+        except Exception as e:
+            print("[inject] pillow skip:", e)
         res = P(ANDROID) / "app" / "src" / "main" / "res"
-        for dens in ("mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"):
+        for dens, size in (("mdpi", 48), ("hdpi", 72), ("xhdpi", 96), ("xxhdpi", 144), ("xxxhdpi", 192)):
             d = res / f"mipmap-{dens}"
             d.mkdir(parents=True, exist_ok=True)
-            (d / "ic_launcher.png").write_bytes(data)
-            (d / "ic_launcher_round.png").write_bytes(data)
-        print("[inject] custom icon written", len(data), "bytes")
+            try:
+                from PIL import Image
+                im = Image.open(io.BytesIO(data)).convert("RGBA")
+                im = im.resize((size, size), Image.LANCZOS)
+                outp = d / "ic_launcher.png"
+                im.save(outp, format="PNG")
+                (d / "ic_launcher_round.png").write_bytes(outp.read_bytes())
+            except Exception:
+                (d / "ic_launcher.png").write_bytes(data)
+                (d / "ic_launcher_round.png").write_bytes(data)
+        print("[inject] custom icon written to mipmaps")
     except Exception as e:
         print("[warn] icon:", e)
 else:
