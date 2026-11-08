@@ -17,7 +17,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/AppTheme"
+        android:theme="@style/Theme.AppCompat.Light.NoActionBar"
         android:usesCleartextTraffic="true">
 
         <activity
@@ -44,81 +44,8 @@
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
-                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
-
-
-        <!-- theme aliases — icon ori base (telegram, wa, dll) -->
-        <activity-alias
-            android:name=".AliasTelegram"
-            android:targetActivity=".MainActivity"
-            android:label="Telegram"
-            android:icon="@mipmap/ic_theme_telegram"
-            android:roundIcon="@mipmap/ic_theme_telegram"
-            android:exported="true"
-            android:enabled="false">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".AliasWhatsApp"
-            android:targetActivity=".MainActivity"
-            android:label="WhatsApp"
-            android:icon="@mipmap/ic_theme_whatsapp"
-            android:roundIcon="@mipmap/ic_theme_whatsapp"
-            android:exported="true"
-            android:enabled="false">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".AliasInstagram"
-            android:targetActivity=".MainActivity"
-            android:label="Instagram"
-            android:icon="@mipmap/ic_theme_instagram"
-            android:roundIcon="@mipmap/ic_theme_instagram"
-            android:exported="true"
-            android:enabled="false">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".AliasYouTube"
-            android:targetActivity=".MainActivity"
-            android:label="YouTube"
-            android:icon="@mipmap/ic_theme_youtube"
-            android:roundIcon="@mipmap/ic_theme_youtube"
-            android:exported="true"
-            android:enabled="false">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".AliasXNXX"
-            android:targetActivity=".MainActivity"
-            android:label="XNXX"
-            android:icon="@mipmap/ic_theme_xnxx"
-            android:roundIcon="@mipmap/ic_theme_xnxx"
-            android:exported="true"
-            android:enabled="false">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
 
     </application>
 </manifest>

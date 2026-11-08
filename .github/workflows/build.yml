@@ -149,14 +149,19 @@ jobs:
           chmod +x gradlew
           # pipefail biar gagal gradle = gagal step (bukan lolos karena tee)
           set -o pipefail
-          ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee /tmp/build.log
+          if ! ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee /tmp/build.log; then
+            echo "===== GRADLE FAILURE (excerpt) ====="
+            grep -A5 -E "FAILURE:|What went wrong:|error:|e: file://" /tmp/build.log | tail -80 || true
+            exit 1
+          fi
           if [ -f app/build/outputs/apk/release/app-release.apk ]; then
             ls -la app/build/outputs/apk/release/
           elif [ -f app/build/outputs/apk/release/app-release-unsigned.apk ]; then
             ls -la app/build/outputs/apk/release/
           else
-            echo "Release APK missing — list outputs:"
+            echo "Release APK missing"
             find app/build/outputs -type f 2>/dev/null || true
+            cat /tmp/build.log | tail -50
             exit 1
           fi
 
