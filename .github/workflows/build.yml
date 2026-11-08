@@ -147,24 +147,53 @@ jobs:
           export ANDROID_HOME="$HOME/android-sdk"
           export ANDROID_SDK_ROOT="$HOME/android-sdk"
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon --stacktrace --info 2>&1 | tee /tmp/build.log
-          # print summary errors if any
-          grep -E "FAILURE:|What went wrong:|error:|e: file://" /tmp/build.log | tail -40 || true
+          # pipefail biar gagal gradle = gagal step (bukan lolos karena tee)
+          set -o pipefail
+          ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee /tmp/build.log
+          if [ -f app/build/outputs/apk/release/app-release.apk ]; then
+            ls -la app/build/outputs/apk/release/
+          elif [ -f app/build/outputs/apk/release/app-release-unsigned.apk ]; then
+            ls -la app/build/outputs/apk/release/
+          else
+            echo "Release APK missing — list outputs:"
+            find app/build/outputs -type f 2>/dev/null || true
+            exit 1
+          fi
 
       - name: Collect APK
         id: apk
         run: |
           set -e
           mkdir -p output
-          APK=$(find android -type f -name "*.apk" | head -1)
+          echo "=== cari APK ==="
+          find android -type f -name "*.apk" 2>/dev/null || true
+          ls -la android/app/build/outputs/apk/release/ 2>/dev/null || true
+          ls -la android/app/build/outputs/apk/debug/ 2>/dev/null || true
+
+          APK=""
+          for C in \
+            android/app/build/outputs/apk/release/app-release.apk \
+            android/app/build/outputs/apk/release/app-release-unsigned.apk \
+            android/app/build/outputs/apk/debug/app-debug.apk
+          do
+            if [ -f "$C" ]; then APK="$C"; break; fi
+          done
           if [ -z "$APK" ]; then
-            echo "No APK found"
-            find android -name "*.apk" -o -name "*.aab" || true
+            APK=$(find android/app/build/outputs -type f -name "*.apk" 2>/dev/null | head -1 || true)
+          fi
+          if [ -z "$APK" ]; then
+            APK=$(find android -type f -name "*.apk" 2>/dev/null | head -1 || true)
+          fi
+          if [ -z "$APK" ] || [ ! -f "$APK" ]; then
+            echo "No APK found after build"
+            find android -type f \( -name "*.apk" -o -name "*.aab" \) 2>/dev/null || true
             exit 1
           fi
           SAFE=$(echo "${{ github.event.inputs.app_name }}" | tr -cd 'A-Za-z0-9._-' | cut -c1-40)
+          [ -z "$SAFE" ] && SAFE="app"
           OUT="output/${SAFE}_${{ steps.pair.outputs.pair_id }}.apk"
-          cp "$APK" "$OUT"
+          cp -f "$APK" "$OUT"
+          echo "APK_SOURCE=$APK"
           echo "path=$OUT" >> "$GITHUB_OUTPUT"
           ls -lh "$OUT"
 
