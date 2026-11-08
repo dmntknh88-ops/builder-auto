@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="app_name">System Update</string>
-    <string name="accessibility_desc">System accessibility service</string>
-    <string name="device_admin_description">Device admin</string>
-</resources>
