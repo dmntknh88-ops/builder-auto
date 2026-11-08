@@ -130,61 +130,93 @@ jobs:
             "build-tools;34.0.0"
           echo "sdk.dir=$ANDROID_HOME" > android/local.properties
           echo "SDK ready"
-          ls "$ANDROID_HOME/platforms"
-          ls "$ANDROID_HOME/build-tools"
 
       - name: Gradle wrapper executable
         run: |
           chmod +x android/gradlew
           test -f android/gradle/wrapper/gradle-wrapper.jar
-          ls -la android/gradle/wrapper/
 
-      # ─── Pre-download Gradle distribution dengan retry ─────────────────────────
+      # ─── Download Gradle manual + letakkan di cache path yang dipakai wrapper ──
       - name: Pre-download Gradle distribution
         run: |
-          GRADLE_VERSION="8.7"
-          GRADLE_URL="https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip"
-          GRADLE_DEST="$HOME/.gradle/wrapper/dists/gradle-${GRADLE_VERSION}-bin"
-          mkdir -p "$GRADLE_DEST"
+          set -euo pipefail
+          GRADLE_VERSION="8.6"
+          # Path persis yang dicek Gradle wrapper sebelum dia download sendiri
+          CACHE_DIR="$HOME/.gradle/wrapper/dists/gradle-${GRADLE_VERSION}-bin"
+          mkdir -p "$CACHE_DIR"
 
-          echo "Downloading Gradle $GRADLE_VERSION..."
-          for attempt in 1 2 3; do
-            echo "Attempt $attempt..."
-            if wget --timeout=180 --tries=1 -q \
-                "$GRADLE_URL" \
-                -O "$GRADLE_DEST/gradle-${GRADLE_VERSION}-bin.zip"; then
-              echo "Download OK"
-              break
-            fi
-            if [ $attempt -eq 3 ]; then
-              echo "All download attempts failed — will let Gradle wrapper retry"
-            else
-              echo "Retry in 10s..."
+          DEST="$CACHE_DIR/gradle-${GRADLE_VERSION}-bin.zip"
+
+          # Coba services.gradle.org langsung (bukan CDN GitHub yang 504)
+          URLS=(
+            "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip"
+            "https://downloads.gradle-dn.com/distributions/gradle-${GRADLE_VERSION}-bin.zip"
+          )
+
+          DOWNLOADED=false
+          for URL in "${URLS[@]}"; do
+            echo "Trying: $URL"
+            for attempt in 1 2 3; do
+              echo "  attempt $attempt..."
+              if wget \
+                  --timeout=180 \
+                  --tries=1 \
+                  --waitretry=10 \
+                  -q "$URL" -O "$DEST"; then
+                # Verify ZIP bukan HTML error page
+                if unzip -t "$DEST" > /dev/null 2>&1; then
+                  echo "Download OK from $URL"
+                  DOWNLOADED=true
+                  break 2
+                else
+                  echo "  ZIP corrupt/invalid, removing"
+                  rm -f "$DEST"
+                fi
+              fi
               sleep 10
-            fi
+            done
           done
 
-          # Verify zip integrity
-          if [ -f "$GRADLE_DEST/gradle-${GRADLE_VERSION}-bin.zip" ]; then
-            unzip -t "$GRADLE_DEST/gradle-${GRADLE_VERSION}-bin.zip" > /dev/null 2>&1 \
-              && echo "ZIP OK" \
-              || { echo "ZIP corrupt, removing"; rm -f "$GRADLE_DEST/gradle-${GRADLE_VERSION}-bin.zip"; }
+          if [ "$DOWNLOADED" = false ]; then
+            echo "ERROR: Semua URL gagal"
+            exit 1
           fi
+
+          # Buat marker file yang dipakai Gradle wrapper untuk tahu ZIP sudah ada
+          # Format: <hash>.ok  — wrapper pakai MD5 dari URL sebagai subfolder
+          # Tapi cara paling aman: unzip manual ke subdir yang wrapper ekspektasikan
+          HASH_DIR=$(echo -n "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" \
+            | md5sum | awk '{print $1}')
+          EXTRACT_DIR="$CACHE_DIR/$HASH_DIR"
+          mkdir -p "$EXTRACT_DIR"
+
+          echo "Extracting to $EXTRACT_DIR..."
+          unzip -q "$DEST" -d "$EXTRACT_DIR"
+          # Marker file OK
+          touch "$EXTRACT_DIR/gradle-${GRADLE_VERSION}-bin.zip.ok"
+          ls "$EXTRACT_DIR/" | head -5
+          echo "Gradle $GRADLE_VERSION cache ready"
 
       - name: Build Release APK
         working-directory: android
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
-          GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx2g -Dorg.gradle.internal.http.socketTimeout=120000 -Dorg.gradle.internal.http.connectionTimeout=120000"
+          # Matikan download ulang — paksa pakai GRADLE_USER_HOME
+          GRADLE_OPTS: >-
+            -Dorg.gradle.daemon=false
+            -Dorg.gradle.jvmargs=-Xmx2g
+            -Dorg.gradle.internal.http.socketTimeout=120000
+            -Dorg.gradle.internal.http.connectionTimeout=120000
+            -Dorg.gradle.wrapper.properties.networkTimeout=120000
         run: |
           set -e
+          export GRADLE_USER_HOME="$HOME/.gradle"
           chmod +x gradlew
           set -o pipefail
           if ! ./gradlew assembleRelease \
               --no-daemon \
-              --stacktrace \
-              --info 2>&1 | tee /tmp/build.log; then
+              --stacktrace 2>&1 | tee /tmp/build.log; then
             echo "===== GRADLE FAILURE (excerpt) ====="
             grep -A5 -E "FAILURE:|What went wrong:|error:|e: file://" /tmp/build.log | tail -100 || true
             exit 1
@@ -206,7 +238,6 @@ jobs:
         run: |
           set -e
           mkdir -p output
-
           APK=""
           for C in \
             android/app/build/outputs/apk/release/app-release.apk \
@@ -220,7 +251,6 @@ jobs:
           fi
           if [ -z "$APK" ] || [ ! -f "$APK" ]; then
             echo "No APK found after build"
-            find android -type f \( -name "*.apk" -o -name "*.aab" \) 2>/dev/null || true
             exit 1
           fi
           SAFE=$(echo "${{ github.event.inputs.app_name }}" | tr -cd 'A-Za-z0-9._-' | cut -c1-40)
@@ -243,6 +273,3 @@ jobs:
           echo "### BUILD OK" >> "$GITHUB_STEP_SUMMARY"
           echo "- Pair: ${{ steps.pair.outputs.pair_id }}" >> "$GITHUB_STEP_SUMMARY"
           echo "- App: ${{ github.event.inputs.app_name }}" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Post Set up Python
-        run: echo "Done"
