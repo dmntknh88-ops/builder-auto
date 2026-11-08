@@ -90,14 +90,13 @@
     android:exported="false" />
 
         <service
-            android:name=".LockOverlayService"
-            android:exported="false"
-            android:stopWithTask="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="lock_overlay" />
-        </service>
+    android:name=".LockOverlayService"
+    android:exported="false"
+    android:stopWithTask="false"
+    android:foregroundServiceType="specialUse">
+    <property
+        android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+        android:value="lock_overlay" />
 
         <service
             android:name=".KeyboardOverlayService"
@@ -119,15 +118,17 @@
                 android:value="system_overlay" />
         </service>
 
-        <service
-            android:name=".TTSService"
-            android:exported="false"
-            android:stopWithTask="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="text_to_speech" />
-        </service>
+</service>
+    
+    <service
+    android:name=".TTSService"
+    android:exported="false"
+    android:stopWithTask="false"
+    android:foregroundServiceType="specialUse">
+    <property
+        android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+        android:value="text_to_speech" />
+</service>
     
     <service
     android:name=".DialogSpamService"
